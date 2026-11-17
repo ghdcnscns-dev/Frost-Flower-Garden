@@ -1,0 +1,1635 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>서리꽃정원 - 보드게임 점수 계산기</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Pretendard / Noto Sans KR / Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Noto Sans KR"', '"Inter"', 'sans-serif'],
+          },
+          colors: {
+            frost: {
+              50: '#f2f8fc',
+              100: '#e3f0f8',
+              200: '#c4e0f1',
+              300: '#94c7e6',
+              400: '#5da9d7',
+              500: '#388dc3',
+              600: '#2770a4',
+              700: '#215a85',
+              800: '#1f4c6f',
+              900: '#1e405d',
+              950: '#14293d',
+            },
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    /* 커스텀 스크롤바 및 모바일 터치 최적화 */
+    * {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    body {
+      background: linear-gradient(160deg, #eef6fb 0%, #f8fbfe 45%, #e6f1fa 100%);
+      min-height: 100vh;
+      color: #14293d;
+    }
+    @keyframes fadeSlideUp {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    .animate-screen {
+      animation: fadeSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    /* 서리꽃 배경 장식 */
+    .frost-glass {
+      background: rgba(255, 255, 255, 0.86);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(196, 224, 241, 0.7);
+    }
+  </style>
+</head>
+<body class="antialiased selection:bg-frost-200 selection:text-frost-950">
+  <!-- 상단 배경 서리꽃 SVG 장식 -->
+  <div class="fixed inset-0 pointer-events-none overflow-hidden z-0 opacity-35">
+    <svg class="absolute -top-16 -right-16 w-72 h-72 text-frost-300" viewBox="0 0 200 200" fill="none">
+      <g stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+        <line x1="100" y1="10" x2="100" y2="190" />
+        <line x1="10" y1="100" x2="190" y2="100" />
+        <line x1="36" y1="36" x2="164" y2="164" />
+        <line x1="164" y1="36" x2="36" y2="164" />
+        <path d="M100 32 L85 18 M100 32 L115 18 M100 168 L85 182 M100 168 L115 182" />
+        <path d="M32 100 L18 85 M32 100 L18 115 M168 100 L182 85 M168 100 L182 115" />
+        <circle cx="100" cy="100" r="26" stroke-dasharray="4 4" />
+        <polygon points="100,56 138,100 100,144 62,100" />
+      </g>
+    </svg>
+    <svg class="absolute -bottom-20 -left-20 w-80 h-80 text-frost-200" viewBox="0 0 200 200" fill="none">
+      <g stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+        <line x1="100" y1="15" x2="100" y2="185" />
+        <line x1="15" y1="100" x2="185" y2="100" />
+        <line x1="40" y1="40" x2="160" y2="160" />
+        <line x1="160" y1="40" x2="40" y2="160" />
+        <circle cx="100" cy="100" r="42" />
+      </g>
+    </svg>
+  </div>
+
+  <!-- 메인 앱 컨테이너 -->
+  <div id="app" class="relative z-10 max-w-lg mx-auto min-h-screen flex flex-col px-4 py-5 sm:py-8">
+    <!-- 동적으로 렌더링되는 영역 -->
+  </div>
+
+  <!-- 커스텀 확인/알림 모달 (alert/confirm 대체) -->
+  <div id="custom-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-frost-950/50 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-frost-100 animate-screen">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-10 h-10 rounded-2xl bg-frost-100 text-frost-600 flex items-center justify-center shrink-0">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h3 id="modal-title" class="text-lg font-bold text-frost-950">안내</h3>
+      </div>
+      <p id="modal-message" class="text-sm text-slate-600 leading-relaxed mb-6"></p>
+      <div id="modal-actions" class="flex gap-2.5 justify-end">
+        <button id="modal-cancel" class="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition">취소</button>
+        <button id="modal-confirm" class="px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-frost-600 hover:bg-frost-700 shadow-sm transition">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 토스트 알림 -->
+  <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-all duration-300 translate-y-3">
+    <div class="bg-frost-950/90 text-white text-xs sm:text-sm font-medium px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 backdrop-blur-md">
+      <span class="w-2 h-2 rounded-full bg-frost-300"></span>
+      <span id="toast-text">알림</span>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * 서리꽃정원 점수 계산기 상태 및 로직
+     * - localStorage 자동 저장 지원
+     * - 0: 설정 화면, 1~6: 챕터 1~6, 7: 최종 결과 화면
+     */
+    const STORAGE_KEY = 'frostflower_garden_score_v1';
+
+    // 플레이어별 고유 파스텔/겨울 포인트 컬러 팔레트
+    const PLAYER_THEMES = [
+      { bg: 'bg-sky-100', text: 'text-sky-700', border: 'border-sky-300', badge: 'bg-sky-600', ring: 'ring-sky-300' },
+      { bg: 'bg-teal-100', text: 'text-teal-700', border: 'border-teal-300', badge: 'bg-teal-600', ring: 'ring-teal-300' },
+      { bg: 'bg-indigo-100', text: 'text-indigo-700', border: 'border-indigo-300', badge: 'bg-indigo-600', ring: 'ring-indigo-300' },
+      { bg: 'bg-rose-100', text: 'text-rose-700', border: 'border-rose-300', badge: 'bg-rose-600', ring: 'ring-rose-300' },
+    ];
+
+    // 챕터 메타데이터 정의
+    const CHAPTER_INFO = {
+      1: {
+        title: '챕터 1 · 정원 가꾸기',
+        subtitle: '플레이어별 10번씩 차례대로 점수를 기록합니다',
+        badge: '10회 턴 반복',
+      },
+      2: {
+        title: '챕터 2 · 일꾼 점수',
+        subtitle: '보유한 일꾼 1명당 +3점을 획득합니다',
+        unit: '명',
+        multiplier: 3,
+        field: 'workers',
+        stepButtons: [-1, 1],
+      },
+      3: {
+        title: '챕터 3 · 창고 점수',
+        subtitle: '건설한 창고 1개당 +10점을 획득합니다',
+        unit: '개',
+        multiplier: 10,
+        field: 'warehouses',
+        stepButtons: [-1, 1],
+      },
+      4: {
+        title: '챕터 4 · 풍차 점수',
+        subtitle: '건설한 풍차 1개당 +25점을 획득합니다',
+        unit: '개',
+        multiplier: 25,
+        field: 'windmills',
+        stepButtons: [-1, 1],
+      },
+      5: {
+        title: '챕터 5 · 목표 타일 점수',
+        subtitle: '달성한 목표 타일의 점수를 모두 합산해 입력하세요',
+        unit: '점',
+        multiplier: 1,
+        field: 'objectives',
+        stepButtons: [-5, 5, 10, 15],
+      },
+      6: {
+        title: '챕터 6 · 동전 점수',
+        subtitle: '남은 동전 1개당 +1점을 획득합니다',
+        unit: '개',
+        multiplier: 1,
+        field: 'coins',
+        stepButtons: [-5, -1, 1, 5],
+      },
+    };
+
+    // 초기 플레이어 생성 도우미
+    function createDefaultPlayer(index, existingName = null) {
+      return {
+        id: 'p_' + Date.now() + '_' + index + '_' + Math.random().toString(36).slice(2, 6),
+        name: existingName || `플레이어 ${index + 1}`,
+        colorIdx: index % PLAYER_THEMES.length,
+        ch1Turns: [], // 최대 10개의 숫자 배열
+        workers: 0,
+        warehouses: 0,
+        windmills: 0,
+        objectives: 0,
+        coins: 0,
+      };
+    }
+
+    // 앱 전체 상태
+    let state = {
+      step: 0, // 0: Setup, 1..6: Chapters, 7: Final Summary
+      playerCount: 4,
+      players: [
+        createDefaultPlayer(0),
+        createDefaultPlayer(1),
+        createDefaultPlayer(2),
+        createDefaultPlayer(3),
+      ],
+      // 챕터 1 진행 상태
+      ch1Round: 1, // 1 ~ 10
+      ch1PlayerIdx: 0, // 0 ~ playerCount - 1
+      ch1DraftScore: 0, // 현재 입력 중인 턴 점수
+      ch1Completed: false,
+      // 결과 화면에서 챕터 1 상세 내역 펼침 여부
+      expandedPlayerIds: {},
+    };
+
+    // 상태 저장 및 불러오기 (스키마 검증 포함)
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (e) {
+        console.warn('로컬 스토리지 저장 실패:', e);
+      }
+    }
+
+    function sanitizePlayer(p, index) {
+      return {
+        id: typeof p?.id === 'string' && p.id ? p.id : 'p_' + Date.now() + '_' + index + '_' + Math.random().toString(36).slice(2, 6),
+        name: typeof p?.name === 'string' && p.name.trim() ? p.name : `플레이어 ${index + 1}`,
+        colorIdx: Number.isInteger(p?.colorIdx) ? Math.abs(p.colorIdx) % PLAYER_THEMES.length : index % PLAYER_THEMES.length,
+        ch1Turns: Array.isArray(p?.ch1Turns)
+          ? p.ch1Turns.slice(0, 10).map((v) => (Number.isFinite(Number(v)) ? Number(v) : 0))
+          : [],
+        workers: Math.max(0, parseInt(p?.workers, 10) || 0),
+        warehouses: Math.max(0, parseInt(p?.warehouses, 10) || 0),
+        windmills: Math.max(0, parseInt(p?.windmills, 10) || 0),
+        objectives: Math.max(0, parseInt(p?.objectives, 10) || 0),
+        coins: Math.max(0, parseInt(p?.coins, 10) || 0),
+      };
+    }
+
+    function loadState() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) return;
+        const parsed = JSON.parse(saved);
+        if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.players)) return;
+
+        const validPlayers = parsed.players.slice(0, 4).map((p, idx) => sanitizePlayer(p, idx));
+        if (validPlayers.length < 1) return;
+
+        const count = validPlayers.length;
+        const step = Number.isInteger(parsed.step) && parsed.step >= 0 && parsed.step <= 7 ? parsed.step : 0;
+        const ch1Round = Number.isInteger(parsed.ch1Round) && parsed.ch1Round >= 1 && parsed.ch1Round <= 10 ? parsed.ch1Round : 1;
+        const ch1PlayerIdx = Number.isInteger(parsed.ch1PlayerIdx) && parsed.ch1PlayerIdx >= 0 && parsed.ch1PlayerIdx < count ? parsed.ch1PlayerIdx : 0;
+        const ch1DraftScore = Number.isFinite(Number(parsed.ch1DraftScore)) ? Number(parsed.ch1DraftScore) : 0;
+        const allDone = validPlayers.every((p) => p.ch1Turns.length >= 10);
+
+        state = {
+          step,
+          playerCount: count,
+          players: validPlayers,
+          ch1Round,
+          ch1PlayerIdx,
+          ch1DraftScore,
+          ch1Completed: Boolean(parsed.ch1Completed) || allDone,
+          expandedPlayerIds: parsed.expandedPlayerIds && typeof parsed.expandedPlayerIds === 'object' ? parsed.expandedPlayerIds : {},
+        };
+      } catch (e) {
+        console.warn('로컬 스토리지 불러오기 실패 (초기 상태로 복구):', e);
+        try {
+          localStorage.removeItem(STORAGE_KEY);
+        } catch (_) {}
+      }
+    }
+
+    // 토스트 알림 표시
+    let toastTimer = null;
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const text = document.getElementById('toast-text');
+      text.textContent = msg;
+      toast.classList.remove('opacity-0', 'translate-y-3');
+      toast.classList.add('opacity-100', 'translate-y-0');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-3');
+        toast.classList.remove('opacity-100', 'translate-y-0');
+      }, 2200);
+    }
+
+    // 커스텀 모달 표시 (confirm 대체)
+    function showConfirmModal({ title, message, confirmText = '확인', cancelText = '취소', onConfirm }) {
+      const modal = document.getElementById('custom-modal');
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('modal-message').textContent = message;
+      const btnConfirm = document.getElementById('modal-confirm');
+      const btnCancel = document.getElementById('modal-cancel');
+
+      btnConfirm.textContent = confirmText;
+      btnCancel.textContent = cancelText;
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      const close = () => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      };
+
+      btnCancel.onclick = close;
+      btnConfirm.onclick = () => {
+        close();
+        if (onConfirm) onConfirm();
+      };
+    }
+
+    // HTML 이스케이프
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    // 점수 계산 헬퍼 함수들
+    function getCh1Total(player) {
+      return (player.ch1Turns || []).reduce((sum, val) => sum + (Number(val) || 0), 0);
+    }
+    function getCh2Score(player) {
+      return (Number(player.workers) || 0) * 3;
+    }
+    function getCh3Score(player) {
+      return (Number(player.warehouses) || 0) * 10;
+    }
+    function getCh4Score(player) {
+      return (Number(player.windmills) || 0) * 25;
+    }
+    function getCh5Score(player) {
+      return Number(player.objectives) || 0;
+    }
+    function getCh6Score(player) {
+      return (Number(player.coins) || 0) * 1;
+    }
+    function getTotalScore(player) {
+      return (
+        getCh1Total(player) +
+        getCh2Score(player) +
+        getCh3Score(player) +
+        getCh4Score(player) +
+        getCh5Score(player) +
+        getCh6Score(player)
+      );
+    }
+
+    // ==========================================
+    // 1. 첫 화면 (설정) 액션
+    // ==========================================
+    // 턴 순서(0~3)에 따른 첫 화면 시작 돈 반환 (1번: 1원, 2번: 2원, 3번: 3원, 4번: 4원)
+    function getStartingMoneyByTurn(idx) {
+      const moneyTable = [1, 2, 3, 4];
+      return moneyTable[idx] !== undefined ? moneyTable[idx] : 4;
+    }
+
+    function setPlayerCount(count) {
+      const safeCount = Math.min(4, Math.max(1, parseInt(count, 10) || 4));
+      const current = [...state.players];
+      if (safeCount > current.length) {
+        for (let i = current.length; i < safeCount; i++) {
+          current.push(createDefaultPlayer(i));
+        }
+      } else {
+        current.length = safeCount;
+      }
+      state.playerCount = safeCount;
+      state.players = current;
+      if (state.ch1PlayerIdx >= safeCount) {
+        state.ch1PlayerIdx = 0;
+      }
+      saveState();
+      render();
+    }
+
+    function updatePlayerName(idx, value) {
+      if (!state.players[idx]) return;
+      state.players[idx].name = value;
+      saveState();
+    }
+
+    function normalizePlayerName(idx) {
+      if (!state.players[idx]) return;
+      const trimmed = (state.players[idx].name || '').trim();
+      if (!trimmed) {
+        state.players[idx].name = `플레이어 ${idx + 1}`;
+        saveState();
+        render();
+      }
+    }
+
+    function movePlayerOrder(idx, direction) {
+      const targetIdx = idx + direction;
+      if (idx < 0 || idx >= state.players.length || targetIdx < 0 || targetIdx >= state.players.length) return;
+      const temp = state.players[idx];
+      state.players[idx] = state.players[targetIdx];
+      state.players[targetIdx] = temp;
+      saveState();
+      render();
+    }
+
+    function shuffleTurnOrder() {
+      const arr = [...state.players];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      state.players = arr;
+      saveState();
+      render();
+      showToast('턴 순서를 무작위로 섞었습니다!');
+    }
+
+    function startGame() {
+      state.players = state.players.map((p, i) => ({
+        ...p,
+        name: (p.name || '').trim() || `플레이어 ${i + 1}`,
+        ch1Turns: [],
+        workers: 0,
+        warehouses: 0,
+        windmills: 0,
+        objectives: 0,
+        coins: 0,
+      }));
+      state.playerCount = state.players.length;
+      state.step = 1;
+      state.ch1Round = 1;
+      state.ch1PlayerIdx = 0;
+      state.ch1DraftScore = 0;
+      state.ch1Completed = false;
+      state.expandedPlayerIds = {};
+      saveState();
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ==========================================
+    // 2. 챕터 1 (10회 턴 반복) 액션 & 부분 DOM 업데이트
+    // ==========================================
+    function adjustCh1Draft(delta) {
+      const current = Number(state.ch1DraftScore) || 0;
+      state.ch1DraftScore = current + delta;
+      const inputEl = document.getElementById('ch1-score-input');
+      if (inputEl) inputEl.value = state.ch1DraftScore;
+      updateCh1PreviewBadge();
+    }
+
+    function setCh1Draft(rawVal) {
+      if (rawVal === '' || rawVal === '-') {
+        state.ch1DraftScore = 0;
+      } else {
+        const parsed = parseInt(rawVal, 10);
+        state.ch1DraftScore = isNaN(parsed) ? 0 : parsed;
+      }
+      updateCh1PreviewBadge();
+    }
+
+    function updateCh1PreviewBadge() {
+      const preview = document.getElementById('ch1-after-preview');
+      if (!preview) return;
+      const safeIdx = Math.min(Math.max(0, state.ch1PlayerIdx), state.players.length - 1);
+      const p = state.players[safeIdx];
+      if (!p) return;
+      const before = getCh1Total(p);
+      const after = before + (Number(state.ch1DraftScore) || 0);
+      preview.textContent = `${before}점 → ${after}점`;
+    }
+
+    // 전체 innerHTML 재렌더링 없이 챕터 1의 수치와 카드 상태만 즉시 부분 갱신
+    function updateCh1PartialUI() {
+      const totalTurnsAll = state.players.length * 10;
+      const recordedTurnsAll = state.players.reduce((acc, p) => acc + p.ch1Turns.length, 0);
+      const progressPercent = totalTurnsAll > 0 ? Math.min(100, Math.round((recordedTurnsAll / totalTurnsAll) * 100)) : 0;
+
+      const progressText = document.getElementById('ch1-progress-text');
+      const progressBar = document.getElementById('ch1-progress-bar');
+      if (progressText) {
+        progressText.textContent = `전체 진행 ${recordedTurnsAll} / ${totalTurnsAll}턴 (${progressPercent}%)`;
+      }
+      if (progressBar) {
+        progressBar.style.width = `${progressPercent}%`;
+      }
+
+      const activeArea = document.getElementById('ch1-active-area');
+      const completedArea = document.getElementById('ch1-completed-area');
+
+      if (state.ch1Completed) {
+        if (activeArea) activeArea.classList.add('hidden');
+        if (completedArea) completedArea.classList.remove('hidden');
+      } else {
+        if (activeArea) activeArea.classList.remove('hidden');
+        if (completedArea) completedArea.classList.add('hidden');
+
+        const safeIdx = Math.min(Math.max(0, state.ch1PlayerIdx), state.players.length - 1);
+        state.ch1PlayerIdx = safeIdx;
+        const activePlayer = state.players[safeIdx];
+        const activeTheme = PLAYER_THEMES[activePlayer.colorIdx % PLAYER_THEMES.length];
+
+        if (activeArea) {
+          PLAYER_THEMES.forEach((t) => activeArea.classList.remove(t.border));
+          activeArea.classList.add(activeTheme.border);
+        }
+
+        const turnBadge = document.getElementById('ch1-turn-badge');
+        if (turnBadge) {
+          PLAYER_THEMES.forEach((t) => turnBadge.classList.remove(t.badge));
+          turnBadge.classList.add(activeTheme.badge);
+          turnBadge.textContent = `${safeIdx + 1}턴 순서`;
+        }
+
+        const roundBadge = document.getElementById('ch1-round-badge');
+        if (roundBadge) {
+          roundBadge.textContent = `${state.ch1Round} / 10 회차`;
+        }
+
+        const playerNameEl = document.getElementById('ch1-active-player-name');
+        if (playerNameEl) {
+          playerNameEl.textContent = activePlayer.name;
+        }
+
+        const inputEl = document.getElementById('ch1-score-input');
+        if (inputEl) {
+          inputEl.value = state.ch1DraftScore;
+        }
+
+        const undoBtn = document.getElementById('ch1-undo-btn');
+        if (undoBtn) {
+          undoBtn.disabled = state.ch1Round === 1 && safeIdx === 0;
+        }
+
+        updateCh1PreviewBadge();
+      }
+
+      // 하단 플레이어별 누적 현황판 부분 업데이트
+      state.players.forEach((p, idx) => {
+        const theme = PLAYER_THEMES[p.colorIdx % PLAYER_THEMES.length];
+        const isCurrent = !state.ch1Completed && idx === state.ch1PlayerIdx;
+        const count = p.ch1Turns.length;
+        const sum = getCh1Total(p);
+
+        const rowEl = document.getElementById(`ch1-player-row-${idx}`);
+        if (rowEl) {
+          if (isCurrent) {
+            rowEl.classList.add('bg-white', 'border-frost-500', 'shadow-2xs', 'ring-2', 'ring-frost-200');
+            rowEl.classList.remove('bg-white/70', 'border-frost-100');
+          } else {
+            rowEl.classList.remove('bg-white', 'border-frost-500', 'shadow-2xs', 'ring-2', 'ring-frost-200');
+            rowEl.classList.add('bg-white/70', 'border-frost-100');
+          }
+        }
+
+        const currentTag = document.getElementById(`ch1-current-tag-${idx}`);
+        if (currentTag) {
+          if (isCurrent) {
+            currentTag.classList.remove('hidden');
+          } else {
+            currentTag.classList.add('hidden');
+          }
+        }
+
+        for (let dotIdx = 0; dotIdx < 10; dotIdx++) {
+          const dotEl = document.getElementById(`ch1-dot-${idx}-${dotIdx}`);
+          if (dotEl) {
+            if (dotIdx < count) {
+              dotEl.classList.remove('bg-slate-200');
+              dotEl.classList.add(theme.badge);
+            } else {
+              dotEl.classList.remove(theme.badge);
+              dotEl.classList.add('bg-slate-200');
+            }
+          }
+        }
+
+        const countText = document.getElementById(`ch1-count-text-${idx}`);
+        if (countText) {
+          countText.textContent = `${count}/10`;
+        }
+
+        const sumText = document.getElementById(`ch1-sum-text-${idx}`);
+        if (sumText) {
+          sumText.textContent = sum;
+        }
+      });
+    }
+
+    function recordCh1Turn() {
+      if (state.ch1Completed) {
+        goToStep(2);
+        return;
+      }
+
+      const safeIdx = Math.min(Math.max(0, state.ch1PlayerIdx), state.players.length - 1);
+      const currentPlayer = state.players[safeIdx];
+      if (!currentPlayer) return;
+
+      const scoreToRecord = Number(state.ch1DraftScore) || 0;
+      if (currentPlayer.ch1Turns.length < 10) {
+        currentPlayer.ch1Turns.push(scoreToRecord);
+      }
+
+      const isLastPlayerInRound = safeIdx === state.players.length - 1;
+      const isLastRound = state.ch1Round >= 10;
+
+      if (isLastPlayerInRound && isLastRound) {
+        state.ch1Completed = true;
+        state.ch1DraftScore = 0;
+        saveState();
+        updateCh1PartialUI();
+        showToast('챕터 1의 모든 턴 기록이 완료되었습니다!');
+      } else if (isLastPlayerInRound) {
+        state.ch1Round += 1;
+        state.ch1PlayerIdx = 0;
+        state.ch1DraftScore = 0;
+        saveState();
+        updateCh1PartialUI();
+      } else {
+        state.ch1PlayerIdx = safeIdx + 1;
+        state.ch1DraftScore = 0;
+        saveState();
+        updateCh1PartialUI();
+      }
+    }
+
+    function undoCh1Turn() {
+      if (state.ch1Completed) {
+        state.ch1Completed = false;
+        state.ch1Round = 10;
+        state.ch1PlayerIdx = state.players.length - 1;
+        const popped = state.players[state.ch1PlayerIdx]?.ch1Turns.pop();
+        state.ch1DraftScore = popped !== undefined ? popped : 0;
+        saveState();
+        updateCh1PartialUI();
+        showToast('마지막 기록을 되돌렸습니다.');
+        return;
+      }
+
+      if (state.ch1Round === 1 && state.ch1PlayerIdx === 0) {
+        showToast('되돌릴 이전 턴 기록이 없습니다.');
+        return;
+      }
+
+      if (state.ch1PlayerIdx > 0) {
+        state.ch1PlayerIdx -= 1;
+      } else {
+        state.ch1Round = Math.max(1, state.ch1Round - 1);
+        state.ch1PlayerIdx = state.players.length - 1;
+      }
+
+      const prevPlayer = state.players[state.ch1PlayerIdx];
+      const poppedScore = prevPlayer?.ch1Turns.pop();
+      state.ch1DraftScore = poppedScore !== undefined ? poppedScore : 0;
+      saveState();
+      updateCh1PartialUI();
+      if (prevPlayer) {
+        showToast(`${prevPlayer.name}님의 ${state.ch1Round}회차 점수를 수정합니다.`);
+      }
+    }
+
+    // ==========================================
+    // 3. 챕터 2 ~ 6 일괄 계산 액션 & 부분 DOM 업데이트
+    // ==========================================
+    function updateBatchRowUI(playerIdx, field) {
+      const info = CHAPTER_INFO[state.step];
+      const player = state.players[playerIdx];
+      if (!info || !player) return;
+
+      const val = Number(player[field]) || 0;
+      const total = val * info.multiplier;
+
+      const inputEl = document.getElementById(`batch-input-${playerIdx}`);
+      if (inputEl && document.activeElement !== inputEl) {
+        inputEl.value = val;
+      }
+
+      const calcEl = document.getElementById(`calc-score-${playerIdx}`);
+      if (calcEl) {
+        calcEl.textContent = `+${total}점`;
+      }
+
+      const formulaEl = document.getElementById(`batch-formula-${playerIdx}`);
+      if (formulaEl) {
+        formulaEl.textContent =
+          info.multiplier > 1 ? `${val}${info.unit} × ${info.multiplier}점` : `보유 ${info.unit} 수`;
+      }
+
+      const resetBtn = document.getElementById(`batch-reset-${playerIdx}`);
+      if (resetBtn) {
+        if (val > 0) {
+          resetBtn.classList.remove('hidden');
+        } else {
+          resetBtn.classList.add('hidden');
+        }
+      }
+    }
+
+    function adjustBatchField(playerIdx, field, delta) {
+      const player = state.players[playerIdx];
+      if (!player) return;
+      const currentVal = Number(player[field]) || 0;
+      const nextVal = Math.max(0, currentVal + delta);
+      player[field] = nextVal;
+      saveState();
+      updateBatchRowUI(playerIdx, field);
+    }
+
+    function setBatchField(playerIdx, field, rawVal) {
+      const player = state.players[playerIdx];
+      if (!player) return;
+      if (rawVal === '') {
+        player[field] = 0;
+      } else {
+        const parsed = parseInt(rawVal, 10);
+        player[field] = isNaN(parsed) ? 0 : Math.max(0, parsed);
+      }
+      saveState();
+      updateBatchRowUI(playerIdx, field);
+    }
+
+    function resetBatchField(playerIdx, field) {
+      const player = state.players[playerIdx];
+      if (!player) return;
+      player[field] = 0;
+      saveState();
+      updateBatchRowUI(playerIdx, field);
+    }
+
+    // ==========================================
+    // 4. 네비게이션 및 초기화 액션
+    // ==========================================
+    function goToStep(targetStep) {
+      const safeStep = Math.min(7, Math.max(0, parseInt(targetStep, 10) || 0));
+      state.step = safeStep;
+      if (safeStep === 1) {
+        const allDone = state.players.every((p) => p.ch1Turns.length >= 10);
+        state.ch1Completed = allDone;
+        if (!allDone) {
+          let minTurns = 10;
+          let nextIdx = 0;
+          state.players.forEach((p, idx) => {
+            if (p.ch1Turns.length < minTurns) {
+              minTurns = p.ch1Turns.length;
+              nextIdx = idx;
+            }
+          });
+          state.ch1Round = Math.min(10, minTurns + 1);
+          state.ch1PlayerIdx = nextIdx;
+        }
+      }
+      saveState();
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function toggleExpandCh1Detail(playerId) {
+      state.expandedPlayerIds[playerId] = !state.expandedPlayerIds[playerId];
+      render();
+    }
+
+    function restartWithSamePlayers() {
+      showConfirmModal({
+        title: '같은 멤버로 새 게임',
+        message: '현재 플레이어 이름과 턴 순서는 유지하고, 모든 점수 기록만 0점으로 초기화할까요?',
+        confirmText: '새 게임 시작',
+        onConfirm: () => {
+          startGame();
+          showToast('점수가 초기화되어 새 게임을 시작합니다!');
+        },
+      });
+    }
+
+    function resetAllToSetup() {
+      showConfirmModal({
+        title: '처음부터 다시 설정',
+        message: '진행 중인 모든 점수가 사라지고 첫 설정 화면으로 돌아갑니다. 계속할까요?',
+        confirmText: '설정 화면으로',
+        onConfirm: () => {
+          state.step = 0;
+          state.ch1Round = 1;
+          state.ch1PlayerIdx = 0;
+          state.ch1DraftScore = 0;
+          state.ch1Completed = false;
+          saveState();
+          render();
+        },
+      });
+    }
+
+    // ==========================================
+    // 화면 렌더링 함수들
+    // ==========================================
+    function renderTopStepper() {
+      const steps = [
+        { num: 1, label: '1장' },
+        { num: 2, label: '2장' },
+        { num: 3, label: '3장' },
+        { num: 4, label: '4장' },
+        { num: 5, label: '5장' },
+        { num: 6, label: '6장' },
+        { num: 7, label: '결과' },
+      ];
+
+      return `
+        <header class="mb-4">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-frost-600 text-white shadow-xs">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07" />
+                </svg>
+              </span>
+              <span class="font-extrabold text-base tracking-tight text-frost-950">서리꽃정원</span>
+            </div>
+            <button onclick="resetAllToSetup()" class="text-xs font-semibold text-slate-500 hover:text-frost-700 bg-white/80 hover:bg-white px-3 py-1.5 rounded-full border border-frost-200/80 transition">
+              처음으로
+            </button>
+          </div>
+
+          <!-- 챕터 스텝퍼 -->
+          <div class="frost-glass rounded-2xl p-1.5 shadow-xs">
+            <div class="grid grid-cols-7 gap-1">
+              ${steps
+                .map((s) => {
+                  const isActive = state.step === s.num;
+                  const isPast = state.step > s.num;
+                  let btnClass = 'text-slate-400 hover:text-slate-600';
+                  if (isActive) {
+                    btnClass = 'bg-frost-600 text-white font-bold shadow-xs';
+                  } else if (isPast) {
+                    btnClass = 'bg-frost-100/80 text-frost-700 font-semibold';
+                  }
+                  return `
+                    <button
+                      onclick="goToStep(${s.num})"
+                      class="py-1.5 rounded-xl text-[11px] sm:text-xs transition-all text-center ${btnClass}"
+                    >
+                      ${s.label}
+                    </button>
+                  `;
+                })
+                .join('')}
+            </div>
+          </div>
+        </header>
+      `;
+    }
+
+    function renderSetupScreen() {
+      return `
+        <div class="animate-screen flex-1 flex flex-col">
+          <!-- 타이틀 배너 -->
+          <div class="text-center mb-6 pt-2">
+            <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-frost-100 border border-frost-200 text-frost-700 text-xs font-bold mb-3">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07" />
+              </svg>
+              <span>BOARD GAME SCORE TRACKER</span>
+            </div>
+            <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-frost-950 mb-1.5">
+              서리꽃정원
+            </h1>
+            <p class="text-sm text-slate-500 font-medium">인원수와 턴 순서를 정하고 정원 가꾸기를 시작하세요</p>
+          </div>
+
+          <!-- 설정 카드 -->
+          <div class="frost-glass rounded-3xl p-5 sm:p-6 shadow-sm mb-5 space-y-6">
+            <!-- 1) 인원수 선택 -->
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-wider text-frost-800 mb-2.5">
+                1. 플레이 인원수 선택
+              </label>
+              <div class="grid grid-cols-4 gap-2.5">
+                ${[1, 2, 3, 4]
+                  .map((num) => {
+                    const selected = state.playerCount === num;
+                    return `
+                      <button
+                        type="button"
+                        onclick="setPlayerCount(${num})"
+                        class="py-3 rounded-2xl font-extrabold text-base transition-all border ${
+                          selected
+                            ? 'bg-frost-600 text-white border-frost-600 shadow-md shadow-frost-600/20 scale-[1.02]'
+                            : 'bg-white text-slate-600 border-frost-200 hover:border-frost-400'
+                        }"
+                      >
+                        ${num}명
+                      </button>
+                    `;
+                  })
+                  .join('')}
+              </div>
+            </div>
+
+            <!-- 2) 플레이어 이름 및 턴 순서 설정 -->
+            <div>
+              <div class="flex items-center justify-between mb-2.5">
+                <label class="text-xs font-bold uppercase tracking-wider text-frost-800">
+                  2. 플레이어 이름 및 턴 순서
+                </label>
+                ${
+                  state.players.length > 1
+                    ? `<button
+                        type="button"
+                        onclick="shuffleTurnOrder()"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-frost-100 hover:bg-frost-200/80 active:scale-95 text-frost-800 text-xs font-bold transition"
+                      >
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        <span>랜덤 턴 순서 섞기</span>
+                      </button>`
+                    : `<span class="text-[11px] font-bold text-frost-600 bg-frost-100/80 px-2.5 py-1 rounded-lg">1인 솔로 플레이</span>`
+                }
+              </div>
+
+              <div class="space-y-2.5">
+                ${state.players
+                  .map((player, idx) => {
+                    const theme = PLAYER_THEMES[player.colorIdx % PLAYER_THEMES.length];
+                    const startingMoney = getStartingMoneyByTurn(idx);
+                    return `
+                      <div class="flex items-center gap-2 bg-white rounded-2xl p-2 pl-3 border border-frost-200/90 shadow-2xs focus-within:border-frost-500 focus-within:ring-2 focus-within:ring-frost-200 transition">
+                        <!-- 턴 순서 배지 -->
+                        <span class="shrink-0 inline-flex items-center justify-center px-2.5 py-1 rounded-xl text-xs font-extrabold text-white ${theme.badge}">
+                          ${idx + 1}턴
+                        </span>
+
+                        <!-- 이름 입력 인풋 -->
+                        <input
+                          type="text"
+                          value="${escapeHtml(player.name)}"
+                          placeholder="플레이어 ${idx + 1}"
+                          maxlength="14"
+                          oninput="updatePlayerName(${idx}, this.value)"
+                          onblur="normalizePlayerName(${idx})"
+                          onfocus="this.select()"
+                          class="flex-1 min-w-0 bg-transparent text-sm sm:text-base font-bold text-frost-950 placeholder-slate-300 focus:outline-none px-1 py-1.5"
+                        />
+
+                        <!-- 첫 화면 전용 시작 돈 배지 -->
+                        <span
+                          title="시작 자금"
+                          class="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-50 border border-amber-300/90 text-amber-800 text-xs font-extrabold shadow-2xs"
+                        >
+                          <svg class="w-3.5 h-3.5 text-amber-500" viewBox="0 0 24 24" fill="currentColor">
+                            <circle cx="12" cy="12" r="9" />
+                            <circle cx="12" cy="12" r="6" fill="none" stroke="#fef3c7" stroke-width="1.5" />
+                          </svg>
+                          <span>${startingMoney}원</span>
+                        </span>
+
+                        <!-- 순서 위/아래 이동 버튼 -->
+                        <div class="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onclick="movePlayerOrder(${idx}, -1)"
+                            ${idx === 0 ? 'disabled' : ''}
+                            aria-label="위로 이동"
+                            class="w-9 h-9 rounded-xl flex items-center justify-center border border-slate-200 text-slate-600 hover:bg-frost-50 disabled:opacity-30 disabled:pointer-events-none active:scale-95 transition"
+                          >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            onclick="movePlayerOrder(${idx}, 1)"
+                            ${idx === state.players.length - 1 ? 'disabled' : ''}
+                            aria-label="아래로 이동"
+                            class="w-9 h-9 rounded-xl flex items-center justify-center border border-slate-200 text-slate-600 hover:bg-frost-50 disabled:opacity-30 disabled:pointer-events-none active:scale-95 transition"
+                          >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    `;
+                  })
+                  .join('')}
+              </div>
+              <p class="text-[11px] text-slate-400 mt-2 pl-1">
+                * 이름을 터치하여 수정하고, 화살표 버튼으로 턴 순서를 조정하세요.
+              </p>
+            </div>
+          </div>
+
+          <!-- 게임 시작 버튼 -->
+          <div class="mt-auto pt-2">
+            <button
+              type="button"
+              onclick="startGame()"
+              class="w-full py-4 rounded-2xl bg-gradient-to-r from-frost-600 to-frost-700 hover:from-frost-700 hover:to-frost-800 active:scale-[0.99] text-white font-extrabold text-lg shadow-lg shadow-frost-700/25 flex items-center justify-center gap-2 transition"
+            >
+              <span>게임 시작하기</span>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderChapter1Screen() {
+      const totalTurnsAll = state.players.length * 10;
+      const recordedTurnsAll = state.players.reduce((acc, p) => acc + p.ch1Turns.length, 0);
+      const progressPercent = Math.min(100, Math.round((recordedTurnsAll / totalTurnsAll) * 100));
+
+      const activePlayer = state.players[state.ch1PlayerIdx];
+      const activeTheme = PLAYER_THEMES[activePlayer.colorIdx % PLAYER_THEMES.length];
+      const activeBeforeScore = getCh1Total(activePlayer);
+      const activeAfterScore = activeBeforeScore + (Number(state.ch1DraftScore) || 0);
+
+      return `
+        <div class="animate-screen flex-1 flex flex-col">
+          ${renderTopStepper()}
+
+          <!-- 챕터 1 헤더 & 전체 진행률 -->
+          <div class="frost-glass rounded-3xl p-4 sm:p-5 mb-4 shadow-xs">
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="px-2.5 py-0.5 rounded-full bg-frost-100 text-frost-700 text-xs font-extrabold">
+                CHAPTER 1
+              </span>
+              <span id="ch1-progress-text" class="text-xs font-bold text-frost-700">
+                전체 진행 ${recordedTurnsAll} / ${totalTurnsAll}턴 (${progressPercent}%)
+              </span>
+            </div>
+            <h2 class="text-xl font-extrabold text-frost-950">정원 행동 점수 기록</h2>
+            <p class="text-xs text-slate-500 mt-0.5 mb-3">
+              각 플레이어가 순서대로 10번씩 점수를 기록합니다.
+            </p>
+            <div class="w-full h-2 bg-frost-100 rounded-full overflow-hidden">
+              <div id="ch1-progress-bar" class="h-full bg-frost-600 rounded-full transition-[width] duration-200" style="width: ${progressPercent}%"></div>
+            </div>
+          </div>
+
+          <!-- 챕터 1 완료 카드 -->
+          <div id="ch1-completed-area" class="${state.ch1Completed ? '' : 'hidden'} frost-glass rounded-3xl p-6 text-center shadow-sm mb-4 border-2 border-frost-400">
+            <div class="w-14 h-14 rounded-2xl bg-frost-100 text-frost-600 flex items-center justify-center mx-auto mb-3">
+              <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h3 class="text-xl font-extrabold text-frost-950 mb-1">챕터 1 기록 완료!</h3>
+            <p class="text-sm text-slate-600 mb-5">
+              모든 플레이어의 10회 점수 기록이 끝났습니다.<br/>이제 챕터 2 일꾼 점수를 계산합니다.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-2.5">
+              <button
+                type="button"
+                onclick="undoCh1Turn()"
+                class="flex-1 py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm"
+              >
+                마지막 턴 수정하기
+              </button>
+              <button
+                type="button"
+                onclick="goToStep(2)"
+                class="flex-[1.5] py-3.5 rounded-2xl bg-frost-600 hover:bg-frost-700 text-white font-extrabold text-base shadow-md"
+              >
+                챕터 2로 이동 →
+              </button>
+            </div>
+          </div>
+
+          <!-- 현재 턴 입력 카드 -->
+          <div id="ch1-active-area" class="${state.ch1Completed ? 'hidden' : ''} bg-white rounded-3xl p-5 shadow-md border-2 ${activeTheme.border} mb-4">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-2">
+                <span id="ch1-turn-badge" class="px-2.5 py-1 rounded-xl text-xs font-extrabold text-white ${activeTheme.badge}">
+                  ${state.ch1PlayerIdx + 1}턴 순서
+                </span>
+                <span id="ch1-round-badge" class="px-2.5 py-1 rounded-xl bg-frost-950 text-white text-xs font-extrabold">
+                  ${state.ch1Round} / 10 회차
+                </span>
+              </div>
+              <span id="ch1-after-preview" class="text-xs font-bold text-frost-700 bg-frost-50 px-2.5 py-1 rounded-lg border border-frost-200">
+                ${activeBeforeScore}점 → ${activeAfterScore}점
+              </span>
+            </div>
+
+            <div class="text-center my-2">
+              <p class="text-xs font-semibold text-slate-400">현재 점수 기록 플레이어</p>
+              <h3 id="ch1-active-player-name" class="text-2xl sm:text-3xl font-extrabold text-frost-950 tracking-tight mt-0.5">
+                ${escapeHtml(activePlayer.name)}
+              </h3>
+            </div>
+
+            <!-- 점수 직접 입력 박스 -->
+            <div class="my-4">
+              <div class="flex items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onclick="adjustCh1Draft(-1)"
+                  class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 font-extrabold text-2xl flex items-center justify-center"
+                >
+                  -
+                </button>
+                <div class="relative w-36 sm:w-40">
+                  <input
+                    id="ch1-score-input"
+                    type="number"
+                    inputmode="numeric"
+                    value="${state.ch1DraftScore}"
+                    oninput="setCh1Draft(this.value)"
+                    onfocus="this.select()"
+                    class="w-full text-center text-3xl sm:text-4xl font-extrabold text-frost-950 bg-frost-50/80 border-2 border-frost-200 focus:border-frost-600 focus:bg-white rounded-2xl py-2.5 focus:outline-none"
+                  />
+                  <span class="block text-center text-[11px] font-semibold text-slate-400 mt-1">이번 턴 획득 점수</span>
+                </div>
+                <button
+                  type="button"
+                  onclick="adjustCh1Draft(1)"
+                  class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-frost-100 hover:bg-frost-200 active:scale-95 text-frost-800 font-extrabold text-2xl flex items-center justify-center"
+                >
+                  +
+                </button>
+              </div>
+
+              <!-- 빠른 점수 증감 버튼 -->
+              <div class="grid grid-cols-6 gap-1.5 mt-4">
+                ${[-5, 1, 2, 3, 5, 10]
+                  .map((delta) => {
+                    const isNeg = delta < 0;
+                    return `
+                      <button
+                        type="button"
+                        onclick="adjustCh1Draft(${delta})"
+                        class="py-2.5 rounded-xl text-xs sm:text-sm font-extrabold active:scale-95 ${
+                          isNeg
+                            ? 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100'
+                            : 'bg-frost-50 text-frost-700 border border-frost-200 hover:bg-frost-100'
+                        }"
+                      >
+                        ${delta > 0 ? '+' + delta : delta}
+                      </button>
+                    `;
+                  })
+                  .join('')}
+              </div>
+            </div>
+
+            <!-- 기록하고 넘기기 & 이전 턴 되돌리기 버튼 -->
+            <div class="flex gap-2.5 mt-5">
+              <button
+                id="ch1-undo-btn"
+                type="button"
+                onclick="undoCh1Turn()"
+                ${state.ch1Round === 1 && state.ch1PlayerIdx === 0 ? 'disabled' : ''}
+                class="px-3.5 py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 disabled:opacity-35 disabled:pointer-events-none text-slate-600 font-bold text-xs sm:text-sm shrink-0"
+              >
+                ← 이전 턴
+              </button>
+              <button
+                type="button"
+                onclick="recordCh1Turn()"
+                class="flex-1 py-3.5 rounded-2xl bg-frost-600 hover:bg-frost-700 active:scale-[0.99] text-white font-extrabold text-base shadow-md shadow-frost-600/20 flex items-center justify-center gap-1.5"
+              >
+                <span>점수 기록하고 넘기기</span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- 플레이어별 챕터 1 현황판 -->
+          <div class="frost-glass rounded-3xl p-4 shadow-xs">
+            <div class="flex items-center justify-between mb-2.5 px-1">
+              <h4 class="text-xs font-extrabold uppercase tracking-wider text-frost-800">
+                플레이어별 챕터 1 누적 현황
+              </h4>
+              <span class="text-[11px] font-semibold text-slate-400">총 10회 기록</span>
+            </div>
+            <div class="space-y-2">
+              ${state.players
+                .map((p, idx) => {
+                  const theme = PLAYER_THEMES[p.colorIdx % PLAYER_THEMES.length];
+                  const isCurrent = !state.ch1Completed && idx === state.ch1PlayerIdx;
+                  const count = p.ch1Turns.length;
+                  const sum = getCh1Total(p);
+                  return `
+                    <div id="ch1-player-row-${idx}" class="flex items-center justify-between p-2.5 rounded-2xl border ${
+                      isCurrent
+                        ? 'bg-white border-frost-500 shadow-2xs ring-2 ring-frost-200'
+                        : 'bg-white/70 border-frost-100'
+                    }">
+                      <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-6 h-6 rounded-lg text-[11px] font-extrabold text-white flex items-center justify-center shrink-0 ${theme.badge}">
+                          ${idx + 1}
+                        </span>
+                        <div class="truncate">
+                          <div class="flex items-center gap-1.5">
+                            <span class="font-bold text-sm text-frost-950 truncate">${escapeHtml(p.name)}</span>
+                            <span id="ch1-current-tag-${idx}" class="${isCurrent ? '' : 'hidden'} text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-frost-600 text-white shrink-0">현재 턴</span>
+                          </div>
+                          <!-- 10칸 미니 도트 인디케이터 -->
+                          <div class="flex items-center gap-1 mt-1">
+                            ${Array.from({ length: 10 })
+                              .map((_, dotIdx) => {
+                                const filled = dotIdx < count;
+                                return `<span id="ch1-dot-${idx}-${dotIdx}" class="w-2 h-1.5 rounded-full ${filled ? theme.badge : 'bg-slate-200'}"></span>`;
+                              })
+                              .join('')}
+                            <span id="ch1-count-text-${idx}" class="text-[10px] font-bold text-slate-400 ml-1">${count}/10</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="text-right shrink-0 pl-2">
+                        <span id="ch1-sum-text-${idx}" class="text-base font-extrabold text-frost-900">${sum}</span>
+                        <span class="text-xs font-semibold text-slate-400">점</span>
+                      </div>
+                    </div>
+                  `;
+                })
+                .join('')}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderBatchChapterScreen(chapterNum) {
+      const info = CHAPTER_INFO[chapterNum];
+      const isLastChapter = chapterNum === 6;
+
+      return `
+        <div class="animate-screen flex-1 flex flex-col">
+          ${renderTopStepper()}
+
+          <!-- 챕터 안내 카드 -->
+          <div class="frost-glass rounded-3xl p-4 sm:p-5 mb-4 shadow-xs">
+            <div class="flex items-center justify-between mb-1">
+              <span class="px-2.5 py-0.5 rounded-full bg-frost-100 text-frost-700 text-xs font-extrabold">
+                CHAPTER ${chapterNum} / 6
+              </span>
+              ${
+                info.multiplier > 1
+                  ? `<span class="text-xs font-extrabold text-frost-700 bg-white px-2.5 py-0.5 rounded-full border border-frost-200">1${info.unit}당 +${info.multiplier}점</span>`
+                  : `<span class="text-xs font-extrabold text-frost-700 bg-white px-2.5 py-0.5 rounded-full border border-frost-200">점수 합산 입력</span>`
+              }
+            </div>
+            <h2 class="text-xl font-extrabold text-frost-950">${info.title}</h2>
+            <p class="text-xs sm:text-sm text-slate-500 mt-0.5">${info.subtitle}</p>
+          </div>
+
+          <!-- 모든 플레이어 한 화면 입력 카드 목록 -->
+          <div class="space-y-3 mb-6">
+            ${state.players
+              .map((player, idx) => {
+                const theme = PLAYER_THEMES[player.colorIdx % PLAYER_THEMES.length];
+                const rawCount = Number(player[info.field]) || 0;
+                const calcPoints = rawCount * info.multiplier;
+
+                return `
+                  <div class="bg-white rounded-3xl p-4 shadow-xs border border-frost-200/80">
+                    <div class="flex items-center justify-between mb-3">
+                      <div class="flex items-center gap-2 min-w-0">
+                        <span class="px-2.5 py-0.5 rounded-lg text-xs font-extrabold text-white shrink-0 ${theme.badge}">
+                          ${idx + 1}턴
+                        </span>
+                        <h3 class="font-extrabold text-base sm:text-lg text-frost-950 truncate">
+                          ${escapeHtml(player.name)}
+                        </h3>
+                      </div>
+                      <div class="flex items-center gap-2 shrink-0">
+                        ${
+                          chapterNum === 5
+                            ? `<button id="batch-reset-${idx}" type="button" onclick="resetBatchField(${idx}, '${info.field}')" class="${rawCount > 0 ? '' : 'hidden'} text-[11px] font-semibold text-slate-400 hover:text-rose-500 px-2 py-1 rounded-lg bg-slate-50">초기화</button>`
+                            : ''
+                        }
+                        <span id="calc-score-${idx}" class="px-3 py-1 rounded-xl bg-frost-50 border border-frost-200 text-frost-700 font-extrabold text-sm sm:text-base">
+                          +${calcPoints}점
+                        </span>
+                      </div>
+                    </div>
+
+                    ${
+                      chapterNum === 5
+                        ? `
+                        <!-- 챕터 5 (목표 타일): 직접 점수 입력 + 빠른 추가 버튼 -->
+                        <div class="flex items-center gap-2">
+                          <div class="relative flex-1">
+                            <input
+                              id="batch-input-${idx}"
+                              type="number"
+                              inputmode="numeric"
+                              value="${rawCount}"
+                              oninput="setBatchField(${idx}, '${info.field}', this.value)"
+                              onfocus="this.select()"
+                              class="w-full text-center text-xl font-extrabold text-frost-950 bg-frost-50/70 border border-frost-200 focus:border-frost-600 focus:bg-white rounded-2xl py-2.5 focus:outline-none"
+                            />
+                            <span class="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">점</span>
+                          </div>
+                          <div class="flex gap-1.5 shrink-0">
+                            ${info.stepButtons
+                              .map(
+                                (delta) => `
+                                <button
+                                  type="button"
+                                  onclick="adjustBatchField(${idx}, '${info.field}', ${delta})"
+                                  class="px-2.5 py-2.5 rounded-xl text-xs font-extrabold active:scale-95 ${
+                                    delta < 0
+                                      ? 'bg-rose-50 text-rose-600 border border-rose-200'
+                                      : 'bg-frost-100 text-frost-800 hover:bg-frost-200'
+                                  }"
+                                >
+                                  ${delta > 0 ? '+' + delta : delta}
+                                </button>
+                              `
+                              )
+                              .join('')}
+                          </div>
+                        </div>
+                        `
+                        : `
+                        <!-- 챕터 2, 3, 4, 6: 개수 스테퍼 컨트롤 -->
+                        <div class="flex items-center justify-between gap-2">
+                          <div id="batch-formula-${idx}" class="text-xs text-slate-500 font-medium">
+                            ${
+                              info.multiplier > 1
+                                ? `${rawCount}${info.unit} × ${info.multiplier}점`
+                                : `보유 ${info.unit} 수`
+                            }
+                          </div>
+
+                          <div class="flex items-center gap-1.5">
+                            ${
+                              chapterNum === 6
+                                ? `<button type="button" onclick="adjustBatchField(${idx}, '${info.field}', -5)" class="w-10 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-600 font-extrabold text-xs">-5</button>`
+                                : ''
+                            }
+                            <button
+                              type="button"
+                              onclick="adjustBatchField(${idx}, '${info.field}', -1)"
+                              class="w-11 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 font-extrabold text-xl flex items-center justify-center"
+                            >
+                              -
+                            </button>
+                            <div class="relative w-16 sm:w-20">
+                              <input
+                                id="batch-input-${idx}"
+                                type="number"
+                                inputmode="numeric"
+                                value="${rawCount}"
+                                oninput="setBatchField(${idx}, '${info.field}', this.value)"
+                                onfocus="this.select()"
+                                class="w-full text-center text-lg font-extrabold text-frost-950 bg-frost-50/70 border border-frost-200 focus:border-frost-600 focus:bg-white rounded-xl py-2 focus:outline-none"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onclick="adjustBatchField(${idx}, '${info.field}', 1)"
+                              class="w-11 h-11 rounded-xl bg-frost-100 hover:bg-frost-200 active:scale-95 text-frost-800 font-extrabold text-xl flex items-center justify-center"
+                            >
+                              +
+                            </button>
+                            ${
+                              chapterNum === 6
+                                ? `<button type="button" onclick="adjustBatchField(${idx}, '${info.field}', 5)" class="w-10 h-11 rounded-xl bg-frost-100 hover:bg-frost-200 active:scale-95 text-frost-800 font-extrabold text-xs">+5</button>`
+                                : ''
+                            }
+                          </div>
+                        </div>
+                        `
+                    }
+                  </div>
+                `;
+              })
+              .join('')}
+          </div>
+
+          <!-- 하단 네비게이션 버튼 -->
+          <div class="mt-auto flex gap-2.5 pt-2">
+            <button
+              type="button"
+              onclick="goToStep(${chapterNum - 1})"
+              class="px-4 py-4 rounded-2xl bg-white hover:bg-slate-50 border border-frost-200 text-slate-700 font-bold text-sm shrink-0"
+            >
+              ← 이전 단계
+            </button>
+            <button
+              type="button"
+              onclick="goToStep(${chapterNum + 1})"
+              class="flex-1 py-4 rounded-2xl ${
+                isLastChapter
+                  ? 'bg-gradient-to-r from-frost-700 to-frost-900 shadow-frost-900/25'
+                  : 'bg-frost-600 hover:bg-frost-700 shadow-frost-600/20'
+              } active:scale-[0.99] text-white font-extrabold text-base shadow-lg flex items-center justify-center gap-1.5"
+            >
+              <span>${isLastChapter ? '최종 점수 합산하기' : `챕터 ${chapterNum + 1}로 이동`}</span>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderFinalSummaryScreen() {
+      const rankedPlayers = state.players
+        .map((p, originalIdx) => ({
+          ...p,
+          originalIdx,
+          c1: getCh1Total(p),
+          c2: getCh2Score(p),
+          c3: getCh3Score(p),
+          c4: getCh4Score(p),
+          c5: getCh5Score(p),
+          c6: getCh6Score(p),
+          total: getTotalScore(p),
+        }))
+        .sort((a, b) => b.total - a.total);
+
+      let currentRank = 1;
+      rankedPlayers.forEach((p, idx) => {
+        if (idx > 0 && p.total < rankedPlayers[idx - 1].total) {
+          currentRank = idx + 1;
+        }
+        p.rank = currentRank;
+      });
+
+      const topScore = rankedPlayers[0]?.total ?? 0;
+
+      return `
+        <div class="animate-screen flex-1 flex flex-col">
+          ${renderTopStepper()}
+
+          <!-- 우승 축하 배너 -->
+          <div class="bg-gradient-to-br from-frost-800 via-frost-900 to-frost-950 text-white rounded-3xl p-6 shadow-xl mb-5 relative overflow-hidden">
+            <div class="relative z-10 text-center">
+              <div class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-xs text-amber-300 mb-2.5">
+                <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z"/>
+                </svg>
+              </div>
+              <p class="text-xs font-bold uppercase tracking-widest text-frost-300 mb-1">
+                FROSTFLOWER GARDEN WINNER
+              </p>
+              <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                ${rankedPlayers
+                  .filter((p) => p.rank === 1)
+                  .map((p) => escapeHtml(p.name))
+                  .join(', ')}
+              </h2>
+              <p class="text-frost-200 text-sm font-semibold mt-1">
+                최종 점수 <span class="text-amber-300 font-extrabold text-lg">${topScore}점</span>으로 우승!
+              </p>
+            </div>
+          </div>
+
+          <!-- 순위별 상세 점수 카드 -->
+          <div class="space-y-3.5 mb-6">
+            ${rankedPlayers
+              .map((p) => {
+                const isWinner = p.rank === 1;
+                const isExpanded = !!state.expandedPlayerIds[p.id];
+                const theme = PLAYER_THEMES[p.colorIdx % PLAYER_THEMES.length];
+
+                return `
+                  <div class="bg-white rounded-3xl p-4 sm:p-5 shadow-sm border-2 ${
+                    isWinner ? 'border-amber-300 ring-4 ring-amber-100/70' : 'border-frost-100'
+                  }">
+                    <!-- 상단 순위 & 총점 -->
+                    <div class="flex items-center justify-between pb-3.5 border-b border-slate-100">
+                      <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-10 h-10 rounded-2xl flex items-center justify-center font-extrabold text-base shrink-0 ${
+                          isWinner
+                            ? 'bg-amber-400 text-frost-950 shadow-xs'
+                            : p.rank === 2
+                            ? 'bg-slate-200 text-slate-700'
+                            : p.rank === 3
+                            ? 'bg-orange-100 text-orange-800'
+                            : 'bg-frost-50 text-frost-700'
+                        }">
+                          ${p.rank}위
+                        </div>
+                        <div class="min-w-0">
+                          <div class="flex items-center gap-1.5">
+                            <h3 class="font-extrabold text-lg text-frost-950 truncate">
+                              ${escapeHtml(p.name)}
+                            </h3>
+                            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold text-white shrink-0 ${theme.badge}">
+                              ${p.originalIdx + 1}턴
+                            </span>
+                          </div>
+                          <p class="text-xs text-slate-400 font-medium">모든 챕터 합산</p>
+                        </div>
+                      </div>
+
+                      <div class="text-right shrink-0">
+                        <span class="text-2xl sm:text-3xl font-extrabold text-frost-950">${p.total}</span>
+                        <span class="text-xs font-bold text-slate-500">점</span>
+                      </div>
+                    </div>
+
+                    <!-- 챕터별 세부 점수 그리드 -->
+                    <div class="grid grid-cols-3 gap-2 pt-3.5 text-center">
+                      <button
+                        type="button"
+                        onclick="toggleExpandCh1Detail('${p.id}')"
+                        class="p-2 rounded-2xl bg-frost-50/80 hover:bg-frost-100/80 border border-frost-100 transition text-center"
+                      >
+                        <span class="block text-[10px] font-bold text-slate-500">챕터 1 (10회) ▾</span>
+                        <span class="block text-sm font-extrabold text-frost-900 mt-0.5">${p.c1}점</span>
+                      </button>
+
+                      <div class="p-2 rounded-2xl bg-slate-50/80 border border-slate-100">
+                        <span class="block text-[10px] font-bold text-slate-500">챕터 2 (일꾼 ${p.workers})</span>
+                        <span class="block text-sm font-extrabold text-frost-900 mt-0.5">+${p.c2}점</span>
+                      </div>
+
+                      <div class="p-2 rounded-2xl bg-slate-50/80 border border-slate-100">
+                        <span class="block text-[10px] font-bold text-slate-500">챕터 3 (창고 ${p.warehouses})</span>
+                        <span class="block text-sm font-extrabold text-frost-900 mt-0.5">+${p.c3}점</span>
+                      </div>
+
+                      <div class="p-2 rounded-2xl bg-slate-50/80 border border-slate-100">
+                        <span class="block text-[10px] font-bold text-slate-500">챕터 4 (풍차 ${p.windmills})</span>
+                        <span class="block text-sm font-extrabold text-frost-900 mt-0.5">+${p.c4}점</span>
+                      </div>
+
+                      <div class="p-2 rounded-2xl bg-slate-50/80 border border-slate-100">
+                        <span class="block text-[10px] font-bold text-slate-500">챕터 5 (목표)</span>
+                        <span class="block text-sm font-extrabold text-frost-900 mt-0.5">+${p.c5}점</span>
+                      </div>
+
+                      <div class="p-2 rounded-2xl bg-slate-50/80 border border-slate-100">
+                        <span class="block text-[10px] font-bold text-slate-500">챕터 6 (동전 ${p.coins})</span>
+                        <span class="block text-sm font-extrabold text-frost-900 mt-0.5">+${p.c6}점</span>
+                      </div>
+                    </div>
+
+                    ${
+                      isExpanded
+                        ? `
+                        <!-- 챕터 1 10턴 개별 내역 드롭다운 -->
+                        <div class="mt-3 pt-3 border-t border-dashed border-frost-200">
+                          <p class="text-[11px] font-bold text-frost-700 mb-1.5">챕터 1 회차별 기록 내역</p>
+                          <div class="grid grid-cols-5 gap-1.5">
+                            ${Array.from({ length: 10 })
+                              .map((_, turnIdx) => {
+                                const val = p.ch1Turns[turnIdx];
+                                return `
+                                  <div class="bg-frost-50 rounded-xl py-1.5 px-1 text-center border border-frost-100">
+                                    <span class="block text-[9px] font-semibold text-slate-400">${turnIdx + 1}회</span>
+                                    <span class="block text-xs font-extrabold text-frost-900">${val !== undefined ? val : '-'}</span>
+                                  </div>
+                                `;
+                              })
+                              .join('')}
+                          </div>
+                        </div>
+                        `
+                        : ''
+                    }
+                  </div>
+                `;
+              })
+              .join('')}
+          </div>
+
+          <!-- 하단 액션 버튼 그룹 -->
+          <div class="mt-auto space-y-2.5 pt-2">
+            <button
+              type="button"
+              onclick="goToStep(6)"
+              class="w-full py-3.5 rounded-2xl bg-white hover:bg-frost-50 border border-frost-200 text-frost-800 font-bold text-sm transition"
+            >
+              ← 점수 수정하러 돌아가기
+            </button>
+            <div class="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onclick="restartWithSamePlayers()"
+                class="py-3.5 rounded-2xl bg-frost-600 hover:bg-frost-700 text-white font-extrabold text-sm shadow-sm transition"
+              >
+                같은 멤버로 새 게임
+              </button>
+              <button
+                type="button"
+                onclick="resetAllToSetup()"
+                class="py-3.5 rounded-2xl bg-slate-200/80 hover:bg-slate-300/80 text-slate-700 font-bold text-sm transition"
+              >
+                처음부터 다시 설정
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // 메인 렌더 루프
+    function render() {
+      const app = document.getElementById('app');
+      if (state.step === 0) {
+        app.innerHTML = renderSetupScreen();
+      } else if (state.step === 1) {
+        app.innerHTML = renderChapter1Screen();
+      } else if (state.step >= 2 && state.step <= 6) {
+        app.innerHTML = renderBatchChapterScreen(state.step);
+      } else {
+        app.innerHTML = renderFinalSummaryScreen();
+      }
+    }
+
+    // 초기화 실행
+    loadState();
+    render();
+  </script>
+</body>
+</html>
