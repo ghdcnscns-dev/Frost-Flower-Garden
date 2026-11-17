@@ -6,7 +6,7 @@
   <title>서리꽃정원 - 보드게임 점수 계산기</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Google Fonts: Pretendard / Noto Sans KR / Inter -->
+  <!-- Google Fonts: Noto Sans KR / Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -40,7 +40,6 @@
     /* 커스텀 스크롤바 및 모바일 터치 최적화 */
     * {
       -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
     }
     body {
       background: linear-gradient(160deg, #eef6fb 0%, #f8fbfe 45%, #e6f1fa 100%);
@@ -60,12 +59,31 @@
     .animate-screen {
       animation: fadeSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
-    /* 서리꽃 배경 장식 */
+    /* 서리꽃 글래스모피즘 */
     .frost-glass {
       background: rgba(255, 255, 255, 0.86);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border: 1px solid rgba(196, 224, 241, 0.7);
+    }
+    /* 드래그 핸들 터치 스크롤 방지 */
+    .drag-handle {
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    /* 드래그 중인 원본 카드 */
+    .is-dragging {
+      opacity: 0.38;
+      transform: scale(0.98);
+      background: #e3f0f8 !important;
+      border-color: #5da9d7 !important;
+    }
+    /* 드롭 대상 카드 강조 */
+    .drag-target-over {
+      border: 2px dashed #2770a4 !important;
+      background: #f2f8fc !important;
+      transform: scale(1.01);
     }
   </style>
 </head>
@@ -131,9 +149,10 @@
     /**
      * 서리꽃정원 점수 계산기 상태 및 로직
      * - localStorage 자동 저장 지원
+     * - 첫 화면 플레이어 순서: 마우스 드래그 앤 드롭 + 모바일 터치/포인터 드래그 완벽 지원
      * - 0: 설정 화면, 1~6: 챕터 1~6, 7: 최종 결과 화면
      */
-    const STORAGE_KEY = 'frostflower_garden_score_v1';
+    const STORAGE_KEY = 'frostflower_garden_score_v2';
 
     // 플레이어별 고유 파스텔/겨울 포인트 컬러 팔레트
     const PLAYER_THEMES = [
@@ -368,9 +387,8 @@
     }
 
     // ==========================================
-    // 1. 첫 화면 (설정) 액션
+    // 1. 첫 화면 (설정) 액션 & 통합 드래그 앤 드롭 (마우스 + 모바일 터치)
     // ==========================================
-    // 턴 순서(0~3)에 따른 첫 화면 시작 돈 반환 (1번: 1원, 2번: 2원, 3번: 3원, 4번: 4원)
     function getStartingMoneyByTurn(idx) {
       const moneyTable = [1, 2, 3, 4];
       return moneyTable[idx] !== undefined ? moneyTable[idx] : 4;
@@ -411,15 +429,192 @@
       }
     }
 
-    function movePlayerOrder(idx, direction) {
-      const targetIdx = idx + direction;
-      if (idx < 0 || idx >= state.players.length || targetIdx < 0 || targetIdx >= state.players.length) return;
-      const temp = state.players[idx];
-      state.players[idx] = state.players[targetIdx];
-      state.players[targetIdx] = temp;
+    function reorderPlayers(fromIdx, toIdx) {
+      if (
+        fromIdx === null ||
+        toIdx === null ||
+        fromIdx === toIdx ||
+        fromIdx < 0 ||
+        toIdx < 0 ||
+        fromIdx >= state.players.length ||
+        toIdx >= state.players.length
+      ) {
+        return;
+      }
+      const movedItem = state.players.splice(fromIdx, 1)[0];
+      state.players.splice(toIdx, 0, movedItem);
       saveState();
       render();
+      showToast(`${movedItem.name}님의 턴 순서가 ${toIdx + 1}턴으로 변경되었습니다.`);
     }
+
+    // 1) 데스크톱 HTML5 Drag & Drop 핸들러
+    let html5DraggedIdx = null;
+
+    function handleDragStart(e, idx) {
+      // 인풋 내부 텍스트 선택 중에는 드래그 시작 방지
+      if (document.activeElement && document.activeElement.tagName === 'INPUT') {
+        document.activeElement.blur();
+      }
+      html5DraggedIdx = idx;
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(idx));
+      }
+      setTimeout(() => {
+        const el = document.getElementById(`player-card-${idx}`);
+        if (el) el.classList.add('is-dragging');
+      }, 0);
+    }
+
+    function handleDragOver(e, idx) {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      document.querySelectorAll('[data-player-card]').forEach((card) => {
+        const cardIdx = Number(card.getAttribute('data-idx'));
+        if (cardIdx === idx && html5DraggedIdx !== idx) {
+          card.classList.add('drag-target-over');
+        } else {
+          card.classList.remove('drag-target-over');
+        }
+      });
+    }
+
+    function handleDragLeave(e, idx) {
+      const targetEl = document.getElementById(`player-card-${idx}`);
+      if (targetEl && !targetEl.contains(e.relatedTarget)) {
+        targetEl.classList.remove('drag-target-over');
+      }
+    }
+
+    function handleDrop(e, targetIdx) {
+      e.preventDefault();
+      const fromIdx = html5DraggedIdx;
+      cleanupDragVisuals();
+      if (fromIdx !== null && fromIdx !== targetIdx) {
+        reorderPlayers(fromIdx, targetIdx);
+      }
+    }
+
+    function handleDragEnd() {
+      cleanupDragVisuals();
+    }
+
+    function cleanupDragVisuals() {
+      html5DraggedIdx = null;
+      document.querySelectorAll('[data-player-card]').forEach((card) => {
+        card.classList.remove('is-dragging', 'drag-target-over');
+      });
+    }
+
+    // 2) 모바일/태블릿 터치 전용 드래그 앤 드롭 (플로팅 고스트 카드 포함)
+    let touchDragState = {
+      active: false,
+      fromIdx: null,
+      targetIdx: null,
+      ghostEl: null,
+      offsetY: 0,
+    };
+
+    function startTouchDrag(e, idx) {
+      if (state.players.length <= 1) return;
+      const touch = e.touches[0];
+      if (!touch) return;
+
+      const cardEl = document.getElementById(`player-card-${idx}`);
+      if (!cardEl) return;
+
+      if (document.activeElement && document.activeElement.tagName === 'INPUT') {
+        document.activeElement.blur();
+      }
+
+      const rect = cardEl.getBoundingClientRect();
+      const ghost = cardEl.cloneNode(true);
+      ghost.id = 'touch-drag-ghost';
+      ghost.style.position = 'fixed';
+      ghost.style.left = `${rect.left}px`;
+      ghost.style.top = `${rect.top}px`;
+      ghost.style.width = `${rect.width}px`;
+      ghost.style.zIndex = '9999';
+      ghost.style.pointerEvents = 'none';
+      ghost.style.boxShadow = '0 16px 32px rgba(20, 41, 61, 0.22)';
+      ghost.style.transform = 'scale(1.03)';
+      ghost.style.borderColor = '#2770a4';
+      ghost.style.background = '#ffffff';
+      document.body.appendChild(ghost);
+
+      cardEl.classList.add('is-dragging');
+
+      touchDragState = {
+        active: true,
+        fromIdx: idx,
+        targetIdx: idx,
+        ghostEl: ghost,
+        offsetY: touch.clientY - rect.top,
+      };
+    }
+
+    function moveTouchDrag(e) {
+      if (!touchDragState.active) return;
+      e.preventDefault(); // 페이지 스크롤 방지
+      const touch = e.touches[0];
+      if (!touch) return;
+
+      if (touchDragState.ghostEl) {
+        touchDragState.ghostEl.style.top = `${touch.clientY - touchDragState.offsetY}px`;
+      }
+
+      // 손가락 위치 아래에 있는 플레이어 카드 탐지
+      const cards = document.querySelectorAll('[data-player-card]');
+      let hoveredIdx = touchDragState.fromIdx;
+
+      cards.forEach((card) => {
+        const rect = card.getBoundingClientRect();
+        const cardIdx = Number(card.getAttribute('data-idx'));
+        if (touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+          hoveredIdx = cardIdx;
+        }
+      });
+
+      touchDragState.targetIdx = hoveredIdx;
+
+      cards.forEach((card) => {
+        const cardIdx = Number(card.getAttribute('data-idx'));
+        if (cardIdx === hoveredIdx && cardIdx !== touchDragState.fromIdx) {
+          card.classList.add('drag-target-over');
+        } else {
+          card.classList.remove('drag-target-over');
+        }
+      });
+    }
+
+    function endTouchDrag() {
+      if (!touchDragState.active) return;
+
+      const { fromIdx, targetIdx, ghostEl } = touchDragState;
+      if (ghostEl && ghostEl.parentNode) {
+        ghostEl.parentNode.removeChild(ghostEl);
+      }
+
+      touchDragState = {
+        active: false,
+        fromIdx: null,
+        targetIdx: null,
+        ghostEl: null,
+        offsetY: 0,
+      };
+
+      cleanupDragVisuals();
+
+      if (fromIdx !== null && targetIdx !== null && fromIdx !== targetIdx) {
+        reorderPlayers(fromIdx, targetIdx);
+      }
+    }
+
+    // 전역 터치 이동/종료 이벤트 바인딩
+    document.addEventListener('touchmove', moveTouchDrag, { passive: false });
+    document.addEventListener('touchend', endTouchDrag);
+    document.addEventListener('touchcancel', endTouchDrag);
 
     function shuffleTurnOrder() {
       const arr = [...state.players];
@@ -488,7 +683,6 @@
       preview.textContent = `${before}점 → ${after}점`;
     }
 
-    // 전체 innerHTML 재렌더링 없이 챕터 1의 수치와 카드 상태만 즉시 부분 갱신
     function updateCh1PartialUI() {
       const totalTurnsAll = state.players.length * 10;
       const recordedTurnsAll = state.players.reduce((acc, p) => acc + p.ch1Turns.length, 0);
@@ -553,7 +747,6 @@
         updateCh1PreviewBadge();
       }
 
-      // 하단 플레이어별 누적 현황판 부분 업데이트
       state.players.forEach((p, idx) => {
         const theme = PLAYER_THEMES[p.colorIdx % PLAYER_THEMES.length];
         const isCurrent = !state.ch1Completed && idx === state.ch1PlayerIdx;
@@ -912,7 +1105,7 @@
               </div>
             </div>
 
-            <!-- 2) 플레이어 이름 및 턴 순서 설정 -->
+            <!-- 2) 플레이어 이름 및 턴 순서 설정 (마우스 + 모바일 터치 드래그 변경) -->
             <div>
               <div class="flex items-center justify-between mb-2.5">
                 <label class="text-xs font-bold uppercase tracking-wider text-frost-800">
@@ -934,13 +1127,37 @@
                 }
               </div>
 
-              <div class="space-y-2.5">
+              <div class="space-y-2.5" id="player-list-container">
                 ${state.players
                   .map((player, idx) => {
                     const theme = PLAYER_THEMES[player.colorIdx % PLAYER_THEMES.length];
                     const startingMoney = getStartingMoneyByTurn(idx);
                     return `
-                      <div class="flex items-center gap-2 bg-white rounded-2xl p-2 pl-3 border border-frost-200/90 shadow-2xs focus-within:border-frost-500 focus-within:ring-2 focus-within:ring-frost-200 transition">
+                      <div
+                        id="player-card-${idx}"
+                        data-player-card="true"
+                        data-idx="${idx}"
+                        draggable="${state.players.length > 1 ? 'true' : 'false'}"
+                        ondragstart="handleDragStart(event, ${idx})"
+                        ondragover="handleDragOver(event, ${idx})"
+                        ondragleave="handleDragLeave(event, ${idx})"
+                        ondrop="handleDrop(event, ${idx})"
+                        ondragend="handleDragEnd()"
+                        class="flex items-center gap-2 bg-white rounded-2xl p-2 pl-2.5 border border-frost-200/90 shadow-2xs focus-within:border-frost-500 focus-within:ring-2 focus-within:ring-frost-200 transition-all duration-150 ${
+                          state.players.length > 1 ? 'cursor-grab active:cursor-grabbing' : ''
+                        }"
+                      >
+                        <!-- 드래그 핸들 (마우스 및 모바일 터치 지원) -->
+                        <div
+                          ontouchstart="startTouchDrag(event, ${idx})"
+                          title="드래그하여 순서 변경"
+                          class="drag-handle flex items-center justify-center w-8 h-9 rounded-xl text-slate-400 hover:text-frost-600 hover:bg-frost-50 shrink-0 transition"
+                        >
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 8h16M4 16h16" />
+                          </svg>
+                        </div>
+
                         <!-- 턴 순서 배지 -->
                         <span class="shrink-0 inline-flex items-center justify-center px-2.5 py-1 rounded-xl text-xs font-extrabold text-white ${theme.badge}">
                           ${idx + 1}턴
@@ -969,39 +1186,13 @@
                           </svg>
                           <span>${startingMoney}원</span>
                         </span>
-
-                        <!-- 순서 위/아래 이동 버튼 -->
-                        <div class="flex items-center gap-1 shrink-0">
-                          <button
-                            type="button"
-                            onclick="movePlayerOrder(${idx}, -1)"
-                            ${idx === 0 ? 'disabled' : ''}
-                            aria-label="위로 이동"
-                            class="w-9 h-9 rounded-xl flex items-center justify-center border border-slate-200 text-slate-600 hover:bg-frost-50 disabled:opacity-30 disabled:pointer-events-none active:scale-95 transition"
-                          >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
-                            </svg>
-                          </button>
-                          <button
-                            type="button"
-                            onclick="movePlayerOrder(${idx}, 1)"
-                            ${idx === state.players.length - 1 ? 'disabled' : ''}
-                            aria-label="아래로 이동"
-                            class="w-9 h-9 rounded-xl flex items-center justify-center border border-slate-200 text-slate-600 hover:bg-frost-50 disabled:opacity-30 disabled:pointer-events-none active:scale-95 transition"
-                          >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </button>
-                        </div>
                       </div>
                     `;
                   })
                   .join('')}
               </div>
               <p class="text-[11px] text-slate-400 mt-2 pl-1">
-                * 이름을 터치하여 수정하고, 화살표 버튼으로 턴 순서를 조정하세요.
+                * 좌측 핸들(≡)이나 카드를 드래그하여 턴 순서를 변경하세요.
               </p>
             </div>
           </div>
